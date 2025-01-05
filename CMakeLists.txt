@@ -10,3 +10,4 @@ include_directories(include)
 
 add_executable(client src/main_client.c src/ipc.c src/client.c)
 add_executable(server src/main_server.c src/ipc.c src/server.c)
+add_executable(game src/main_game.c src/game_logic.c)
