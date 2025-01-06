@@ -5,19 +5,19 @@
 #include <time.h>
 
 void initialize_game(GameWorld *world, const char *file_path) {
-    for (int y = 0; y < WORLD_HEIGHT; y++) {
-        for (int x = 0; x < WORLD_WIDTH; x++) {
+    for (int y = 0; y < world->world_height; y++) {
+        for (int x = 0; x < world->world_width; x++) {
             world->grid[y][x] = TILE_EMPTY;
         }
     }
 
     FILE *file = fopen(file_path, "r");
     if (file) {
-        char line[WORLD_WIDTH + 2];
+        char line[world->world_width + 2];
         int y = 0;
 
-        while (fgets(line, sizeof(line), file) && y < WORLD_HEIGHT) {
-            for (int x = 0; x < WORLD_WIDTH && line[x] != '\n' && line[x] != '\0'; x++) {
+        while (fgets(line, sizeof(line), file) && y < world->world_height) {
+            for (int x = 0; x < world->world_width && line[x] != '\n' && line[x] != '\0'; x++) {
                 if (line[x] == '#') {
                     world->grid[y][x] = TILE_OBSTACLE;
                 }
@@ -25,10 +25,13 @@ void initialize_game(GameWorld *world, const char *file_path) {
             y++;
         }
         fclose(file);
-
         printf("Game world loaded from file: %s\n", file_path);
     } else {
-        printf("Could not load world file '%s'. Falling back to an empty world.\n", file_path);
+        if (file_path == NULL) {
+            printf("Obstacle-free world created with dimensions %dx%d.\n", world->world_width, world->world_height);
+        } else {
+            printf("Could not load world file '%s'. Falling back to an empty world.\n", file_path);
+        }
     }
 
     world->num_snakes = 0;
@@ -51,8 +54,8 @@ void spawn_snake(GameWorld *world, int snake_index) {
 
     int x, y;
     do {
-        x = rand() % (WORLD_WIDTH - snake->length);
-        y = rand() % WORLD_HEIGHT;
+        x = rand() % (world->world_width - snake->length);
+        y = rand() % world->world_height;
     } while (world->grid[y][x] != TILE_EMPTY || world->grid[y][x + 1] != TILE_EMPTY || world->grid[y][x + 2] != TILE_EMPTY);
 
     for (int i = 0; i < snake->length; i++) {
@@ -69,13 +72,9 @@ void spawn_fruit(GameWorld *world) {
     while (world->num_fruits < world->num_snakes) {
         int x, y;
         do {
-            x = rand() % WORLD_WIDTH;
-            y = rand() % WORLD_HEIGHT;
+            x = rand() % world->world_width;
+            y = rand() % world->world_height;
         } while (world->grid[y][x] != TILE_EMPTY);
-
-        world->fruits[world->num_fruits].position.x = x;
-        world->fruits[world->num_fruits].position.y = y;
-        world->fruits[world->num_fruits].active = true;
 
         world->grid[y][x] = TILE_FRUIT;
         world->num_fruits++;
@@ -93,8 +92,8 @@ void render_game(const GameWorld *world) {
     }
     printf("\n");
 
-    for (int y = 0; y < WORLD_HEIGHT; y++) {
-        for (int x = 0; x < WORLD_WIDTH; x++) {
+    for (int y = 0; y < world->world_height; y++) {
+        for (int x = 0; x < world->world_width; x++) {
             bool is_head = false;
 
             for (int i = 0; i < world->num_snakes; i++) {
@@ -122,7 +121,7 @@ void render_game(const GameWorld *world) {
     }
 
     printf("\n");
-    printf("\033[%d;0H", WORLD_HEIGHT + 5);
+    printf("\033[%d;0H", world->world_height + 5);
 }
 
 void handle_collision(GameWorld *world, Snake *snake) {
@@ -142,13 +141,13 @@ void handle_collision(GameWorld *world, Snake *snake) {
 
 bool check_collision(GameWorld *world, Snake *snake, int *next_x, int *next_y) {
     if (*next_x < 0) {
-        *next_x = WORLD_WIDTH - 1;
-    } else if (*next_x >= WORLD_WIDTH) {
+        *next_x = world->world_width - 1;
+    } else if (*next_x >= world->world_width) {
         *next_x = 0;
     }
     if (*next_y < 0) {
-        *next_y = WORLD_HEIGHT - 1;
-    } else if (*next_y >= WORLD_HEIGHT) {
+        *next_y = world->world_height - 1;
+    } else if (*next_y >= world->world_height) {
         *next_y = 0;
     }
 
@@ -200,9 +199,9 @@ void move_snake(GameWorld *world, Snake *snake) {
     world->grid[next_y][next_x] = TILE_SNAKE;
 
     if (ate_fruit) {
-        if (snake->length < MAX_SNAKE_LENGTH) {
+        if (snake->length < world->world_height * world->world_width) {
             snake->length++;
-	    snake->body[snake->length - 1].x = old_tail_x;
+	        snake->body[snake->length - 1].x = old_tail_x;
             snake->body[snake->length - 1].y = old_tail_y;
         }
         snake->score++;

@@ -6,9 +6,11 @@
 
 #define MAX_SNAKES 4
 #define MAX_FRUITS 4
-#define WORLD_WIDTH 20
-#define WORLD_HEIGHT 20
-#define MAX_SNAKE_LENGTH 400
+#define DEFAULT_WIDTH 20
+#define DEFAULT_HEIGHT 20
+#define MAX_WIDTH 50
+#define MAX_HEIGHT 50
+#define MAX_SNAKE_LENGTH 2500
 
 typedef enum {
     TILE_EMPTY,
@@ -29,7 +31,7 @@ typedef struct {
 } Position;
 
 typedef struct {
-    Position body[WORLD_WIDTH * WORLD_HEIGHT];
+    Position body[MAX_SNAKE_LENGTH];
     int length;
     Direction direction;
     bool alive;
@@ -37,17 +39,14 @@ typedef struct {
 } Snake;
 
 typedef struct {
-    Position position;
-    bool active;
-} Fruit;
-
-typedef struct {
-    TileType grid[WORLD_HEIGHT][WORLD_WIDTH];
+    TileType grid[MAX_HEIGHT][MAX_WIDTH];
     Snake snakes[MAX_SNAKES];
-    Fruit fruits[MAX_FRUITS];
     int num_snakes;
     int num_fruits;
     int elapsed_time;
+    int world_width;
+    int world_height;
+    int game_duration;
 } GameWorld;
 
 bool check_collision(GameWorld *world, Snake *snake, int *next_x, int *next_y);
