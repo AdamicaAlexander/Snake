@@ -1,4 +1,4 @@
-#include "include/ipc.h"
+#include "ipc.h"
 
 int create_server_socket() {
     int server_fd = socket(AF_UNIX, SOCK_STREAM, 0);

@@ -111,6 +111,8 @@ int main(int argc, char *argv[]) {
     printf("\033[%d;0H", world.world_height + 5);
     render_game(&world);
 
+    while ((getchar()) != '\n' && getchar() != EOF);
+
     char ch;
     printf("Press Enter to start\n");
     scanf("%c",&ch);

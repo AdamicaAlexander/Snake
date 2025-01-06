@@ -17,12 +17,22 @@ void initialize_game(GameWorld *world, const char *file_path) {
         int y = 0;
 
         while (fgets(line, sizeof(line), file) && y < world->world_height) {
-            for (int x = 0; x < world->world_width && line[x] != '\n' && line[x] != '\0'; x++) {
+            int len = strlen(line);
+
+            if (len > 0 && (line[len - 1] == '\n' || line[len - 1] == '\r')) {
+                line[len - 1] = '\0';
+                len--;
+            }
+
+            for (int x = 0; x < len && x < world->world_width; x++) {
                 if (line[x] == '#') {
                     world->grid[y][x] = TILE_OBSTACLE;
                 }
             }
-            y++;
+
+            if (len > 0) {
+                y++;
+            }
         }
         fclose(file);
         printf("Game world loaded from file: %s\n", file_path);
