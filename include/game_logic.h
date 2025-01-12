@@ -1,8 +1,12 @@
 #ifndef GAME_LOGIC_H
 #define GAME_LOGIC_H
 
-#include <stdbool.h>
+#include <pthread.h>
+#include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
+#include <string.h>
+#include <time.h>
 
 #define MAX_SNAKES 4
 #define MAX_FRUITS 4
@@ -50,11 +54,12 @@ typedef struct {
 } GameWorld;
 
 bool check_collision(GameWorld *world, Snake *snake, int *next_x, int *next_y);
-void handle_collision(GameWorld *world, Snake *snake);
-void move_snake(GameWorld *world, Snake *snake);
+void remove_snake(GameWorld *world, Snake *snake);
+void move_snakes(GameWorld *world);
 void initialize_game(GameWorld *world, const char *file_path);
 void spawn_snake(GameWorld *world, int snake_index);
 void spawn_fruit(GameWorld *world);
 void render_game(const GameWorld *world);
+void game_menu(GameWorld *world);
 
 #endif // GAME_LOGIC_H

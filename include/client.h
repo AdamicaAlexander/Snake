@@ -1,15 +1,20 @@
 #ifndef CLIENT_H
 #define CLIENT_H
 
-#include <pthread.h>
-#include <stdbool.h>
 #include "ipc.h"
+#include "game_logic.h"
 
-#define MAX_USER_INPUT 256
+#include <stdbool.h>
+#include <unistd.h>
+#include <pthread.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
-void start_client();
+void run_client(IPCResources *ipc, bool new_game);
+
+void setup_terminal();
+void restore_terminal();
 void stop_client();
-void *input_handler(void *arg);
-void *server_listener(void *arg);
 
 #endif // CLIENT_H

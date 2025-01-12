@@ -1,8 +1,4 @@
 #include "game_logic.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
 
 void initialize_game(GameWorld *world, const char *file_path) {
     for (int y = 0; y < world->world_height; y++) {
@@ -92,15 +88,8 @@ void spawn_fruit(GameWorld *world) {
 }
 
 void render_game(const GameWorld *world) {
+	printf("\033[2J");
     printf("\033[H");
-
-    printf("Time: %d seconds\n", world->elapsed_time);
-    for (int i = 0; i < world->num_snakes; i++) {
-        if (world->snakes[i].alive) {
-            printf("Snake %d Score: %d\n", i + 1, world->snakes[i].score);
-        }
-    }
-    printf("\n");
 
     for (int y = 0; y < world->world_height; y++) {
         for (int x = 0; x < world->world_width; x++) {
@@ -127,17 +116,22 @@ void render_game(const GameWorld *world) {
             }
         }
         printf("\n");
-
     }
 
-    printf("\n");
-    printf("\033[%d;0H", world->world_height + 5);
+	printf("\n");
+	printf("Time: %d seconds\n", world->elapsed_time);
+
+    for (int i = 0; i < world->num_snakes; i++) {
+        if (world->snakes[i].alive) {
+            printf("Snake %d Score: %d\n", i + 1, world->snakes[i].score);
+        }
+    }
 }
 
-void handle_collision(GameWorld *world, Snake *snake) {
+void remove_snake(GameWorld *world, Snake *snake) {
     snake->alive = false;
 
-    printf("\n Snake collided with itself or an obstacle and died!\n");
+    printf("\n Snake died!\n");
 
     for (int i = 0; i < snake->length; i++) {
         int x = snake->body[i].x;
@@ -146,7 +140,6 @@ void handle_collision(GameWorld *world, Snake *snake) {
     }
 
     world->num_snakes--;
-    render_game(world);
 }
 
 bool check_collision(GameWorld *world, Snake *snake, int *next_x, int *next_y) {
@@ -174,50 +167,116 @@ bool check_collision(GameWorld *world, Snake *snake, int *next_x, int *next_y) {
     return false;
 }
 
-
-void move_snake(GameWorld *world, Snake *snake) {
-    if (!snake->alive) {
-        return;
-    }
-
-    int next_x = snake->body[0].x;
-    int next_y = snake->body[0].y;
-
-    switch (snake->direction) {
-        case UP:    next_y--; break;
-        case DOWN:  next_y++; break;
-        case LEFT:  next_x--; break;
-        case RIGHT: next_x++; break;
-    }
-
-    if (check_collision(world, snake, &next_x, &next_y)) {
-        handle_collision(world, snake);
-        return;
-    }
-
-    int old_tail_x = snake->body[snake->length - 1].x;
-    int old_tail_y = snake->body[snake->length - 1].y;
-
-    bool ate_fruit = (world->grid[next_y][next_x] == TILE_FRUIT);
-
-    for (int i = snake->length - 1; i > 0; i--) {
-        snake->body[i] = snake->body[i - 1];
-    }
-    snake->body[0].x = next_x;
-    snake->body[0].y = next_y;
-
-    world->grid[next_y][next_x] = TILE_SNAKE;
-
-    if (ate_fruit) {
-        if (snake->length < world->world_height * world->world_width) {
-            snake->length++;
-	        snake->body[snake->length - 1].x = old_tail_x;
-            snake->body[snake->length - 1].y = old_tail_y;
+void move_snakes(GameWorld *world) {
+    for (int i = 0; i < world->num_snakes; i++) {
+        Snake *snake = &world->snakes[i];
+        if (!snake->alive) {
+            return;
         }
-        snake->score++;
-        world->num_fruits--;
-        spawn_fruit(world);
+
+        int next_x = snake->body[0].x;
+        int next_y = snake->body[0].y;
+
+        switch (snake->direction) {
+            case UP:    next_y--; break;
+            case DOWN:  next_y++; break;
+            case LEFT:  next_x--; break;
+            case RIGHT: next_x++; break;
+        }
+
+        if (check_collision(world, snake, &next_x, &next_y)) {
+            remove_snake(world, snake);
+            return;
+        }
+
+        int old_tail_x = snake->body[snake->length - 1].x;
+        int old_tail_y = snake->body[snake->length - 1].y;
+
+        bool ate_fruit = (world->grid[next_y][next_x] == TILE_FRUIT);
+
+        for (int i = snake->length - 1; i > 0; i--) {
+            snake->body[i] = snake->body[i - 1];
+        }
+
+        snake->body[0].x = next_x;
+        snake->body[0].y = next_y;
+
+        world->grid[next_y][next_x] = TILE_SNAKE;
+
+        if (ate_fruit) {
+            if (snake->length < world->world_height * world->world_width) {
+                snake->length++;
+                snake->body[snake->length - 1].x = old_tail_x;
+                snake->body[snake->length - 1].y = old_tail_y;
+            }
+
+            snake->score++;
+            world->num_fruits--;
+            spawn_fruit(world);
+        } else {
+            world->grid[old_tail_y][old_tail_x] = TILE_EMPTY;
+        }
+    }
+}
+
+void game_menu(GameWorld *world) {
+    printf("Select game mode:\n");
+    printf("1. Standard Mode\n");
+    printf("2. Timed Mode\n");
+    printf("Enter your choice (1 or 2): ");
+    int mode_choice;
+    scanf("%d", &mode_choice);
+
+    if (mode_choice == 1) {
+        world->game_duration = 0;
+    } else if (mode_choice == 2) {
+        int duration = 0;
+        printf("Enter time limit in seconds: ");
+        scanf("%d", &duration);
+
+        if (duration <= 0) {
+            printf("Invalid time limit! Defaulting to Standard Mode.\n");
+            duration = 0;
+        }
+        world->game_duration = duration;
     } else {
-        world->grid[old_tail_y][old_tail_x] = TILE_EMPTY;
+        printf("Invalid choice! Defaulting to Standard Mode.\n");
+        world->game_duration = 0;
+    }
+
+    int world_choice;
+    printf("\nSelect world type:\n");
+    printf("1. Obstacle-free world (custom dimensions)\n");
+    printf("2. World with obstacles (20x20 world from file)\n");
+    printf("Enter your choice (1 or 2): ");
+    scanf("%d", &world_choice);
+
+    if (world_choice == 1) {
+        int width, height;
+        printf("Enter world width (max %d): ", MAX_WIDTH);
+        scanf("%d", &width);
+        printf("Enter world height (max %d): ", MAX_HEIGHT);
+        scanf("%d", &height);
+
+        if (width <= 0 || width > MAX_WIDTH || height <= 0 || height > MAX_HEIGHT) {
+            printf("Invalid dimensions! Using default %dx%d.\n", DEFAULT_WIDTH, DEFAULT_HEIGHT);
+            width = DEFAULT_WIDTH;
+            height = DEFAULT_HEIGHT;
+        }
+
+        world->world_width = width;
+        world->world_height = height;
+
+        initialize_game(world, NULL);
+    } else if (world_choice == 2) {
+        char *file_path = "../../assets/world.txt";
+        world->world_width = DEFAULT_WIDTH;
+        world->world_height = DEFAULT_HEIGHT;
+        initialize_game(world, file_path);
+    } else {
+        printf("Invalid choice! Defaulting to obstacle-free world.\n");
+        world->world_width = DEFAULT_WIDTH;
+        world->world_height = DEFAULT_HEIGHT;
+        initialize_game(world, NULL);
     }
 }

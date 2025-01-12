@@ -1,74 +1,110 @@
 #include "client.h"
 
-int server_fd = -1;
-bool client_running = true;
-pthread_t input_thread, listener_thread;
+static struct termios original_termios;
 
-void start_client() {
-    server_fd = create_client_socket();
+static pthread_t input_tid, display_tid;
+static volatile int running = 1;
+static int my_snake_index = -1;
+static int server_fd = -1;
 
-    printf("Client started. Connected to server.\n");
+void restore_terminal() {
+    tcsetattr(STDIN_FILENO, TCSANOW, &original_termios);
+}
 
-    if (pthread_create(&input_thread, NULL, input_handler, NULL) != 0) {
-        perror("Error creating input thread");
-        stop_client();
-        return;
+void setup_terminal() {
+    struct termios new_termios;
+    tcgetattr(STDIN_FILENO, &original_termios);
+
+    atexit(restore_terminal);
+
+    new_termios = original_termios;
+
+    new_termios.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
+
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK);
+}
+
+void *client_input_thread(void *arg) {
+    char user_input;
+
+    setup_terminal();
+
+    while (running) {
+        user_input = getchar();
+
+        if (user_input == 'w' || user_input == 'a' || user_input == 's' || user_input == 'd' || user_input == 'q') {
+            send_message(server_fd, &user_input);
+        }
+
+        if (user_input == 'q') {
+            printf("Exiting client...\n");
+            running = false;
+            break;
+        }
     }
 
-    if (pthread_create(&listener_thread, NULL, server_listener, NULL) != 0) {
-        perror("Error creating listener thread");
-        stop_client();
-        return;
+    restore_terminal();
+
+    pthread_exit(NULL);
+
+}
+
+
+void *client_display_thread(void *arg) {
+    IPCResources *ipc = (IPCResources*)arg;
+
+    while (running) {
+        sem_wait(ipc->sem_game);
+		render_game(ipc->world);
+        sem_post(ipc->sem_game);
+
+        usleep(20000);
     }
 
-    pthread_join(input_thread, NULL);
-    pthread_join(listener_thread, NULL);
-
-    stop_client();
+    return NULL;
 }
 
 void stop_client() {
-    printf("Stopping client...\n");
-    client_running = false;
-
-    if (server_fd >= 0) {
-        close(server_fd);
-    }
-
-    printf("Client stopped.\n");
+    restore_terminal();
 }
 
-void *input_handler(void *arg) {
-    char user_input[MAX_USER_INPUT];
+void run_client(IPCResources *ipc, bool new_game) {
+    signal(SIGINT, client_signal_handler);
+    signal(SIGTERM, client_signal_handler);
 
-    while (client_running) {
-        printf("Enter command: ");
-		
-        if (fgets(user_input, MAX_USER_INPUT, stdin) == NULL) {
-            printf("Error reading input.\n");
-            break;
-        }
+    server_fd = create_client_socket();
 
-        user_input[strcspn(user_input, "\n")] = '\0';
-        send_message(server_fd, user_input);
-
-        if (strcmp(user_input, "exit") == 0) {
-            printf("Exiting client...\n");
-            client_running = false;
-            break;
-        }
+    if (new_game) {
+        sem_wait(ipc->sem_game);
+        game_menu(ipc->world);
+        sem_post(ipc->sem_game);
     }
 
-    pthread_exit(NULL);
-}
+    setup_terminal();
 
-void *server_listener(void *arg) {
-    char buffer[BUFFER_SIZE];
+    sem_wait(ipc->sem_game);
+    my_snake_index = ipc->world->num_snakes;
+    sem_post(ipc->sem_game);
 
-    while (client_running) {
-        receive_message(server_fd, buffer, BUFFER_SIZE);
-        printf("Server: %s\n", buffer);
-    }
+    sem_post(ipc->sem_clients);
 
-    pthread_exit(NULL);
+    printf("[CLIENT] creating input thread.\n");
+    pthread_create(&input_tid, NULL, client_input_thread, NULL);
+    printf("[CLIENT] input thread created.\n");
+
+    printf("[CLIENT] creating display thread.\n");
+    pthread_create(&display_tid, NULL, client_display_thread, ipc);
+    printf("[CLIENT] display thread created.\n");
+
+    pthread_join(input_tid, NULL);
+    printf("[CLIENT] input thread finished.\n");
+
+    pthread_join(display_tid, NULL);
+    printf("[CLIENT] display thread finished.\n");
+
+    printf("[CLIENT] Končím.\n");
+
+    stop_client();
 }
